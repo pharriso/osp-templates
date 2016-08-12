@@ -1,0 +1,3 @@
+parameters:
+  ControllerRemovalPolicies:
+    [{'resource_list': ['2']}]

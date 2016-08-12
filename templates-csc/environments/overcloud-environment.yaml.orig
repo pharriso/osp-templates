@@ -1,0 +1,42 @@
+## Custom changes to overcloud
+resource_registry:
+  OS::TripleO::NodeExtraConfigPost: /home/stack/templates/extraconfig/post_deploy/extraconfig.yaml
+  OS::TripleO::StorageConfigPost: /home/stack/templates/extraconfig/post_deploy/storageconfig.yaml
+parameter_defaults:
+  TimeZone: 'London' 
+  CloudDomain: 'example.com'
+  ldapserver: 'ldap://10.0.0.10,ldap://10.0.0.11'
+  ldapdomain: 'EXAMPLE'
+  ldappassword: redhat123
+  ldapuser: "uid=search,cn=users,cn=accounts,dc=example,dc=com"
+  message: test
+
+  ControllerEnableSwiftStorage: False
+
+  ControllerSchedulerHints:
+      'capabilities:node': 'controller-%index%'
+  NovaComputeSchedulerHints:
+      'capabilities:node': 'novacompute-%index%'
+  HostnameMap:
+      overcloud-controller-0: controller0
+      overcloud-controller-1: controller1
+      overcloud-controller-2: controller2
+      overcloud-novacompute-0: compute0
+
+  ExtraConfig:
+      nova::api::auth_version: v3
+
+  controllerExtraConfig:
+      horizon::keystone_multidomain_support: True
+      horizon::keystone_default_domain: Default
+      horizon::api_versions: "{'identity': 3}"
+      cinder_enable_scaleio: true
+      cinder_user_enabled_backends: "[ScaleIO,ScaleIO2]"
+      scaleio::params::san_ip: 10.0.0.250
+      scaleio::params::san_login: admin
+      scaleio::params::san_password: password
+      scaleio::params::sio_protection_domain_name: Domain1
+      scaleio::params::sio_storage_pool_name1: pool1
+      scaleio::params::sio_storage_pool_name2: pool2
+      scaleio::params::sio_storage_pools: Domain1:pool1,Domain1:pool2
+

@@ -1,0 +1,73 @@
+heat_template_version: 2014-10-16
+
+description: >
+  Example extra config for post-deployment
+
+# Note extra parameters can be defined, then passed data via the
+# environment parameter_defaults, without modifying the parent template
+parameters:
+  servers:
+    type: json
+  ldapserver:
+    type: string
+  ldapdomain:
+    type: string
+  ldapuser:
+    type: string
+  ldappassword:
+    type: string
+
+resources:
+
+  ExtraConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            if [ `hostname | grep cont | wc -l` -ge 1 ]
+            then
+            # LDAP Config only on controllers
+            	setsebool -P authlogin_nsswitch_use_ldap=on
+            	mkdir -p /etc/keystone/domains/
+            	chown keystone /etc/keystone/domains/
+            	openstack-config --set /etc/keystone/keystone.conf identity domain_specific_drivers_enabled true
+            	openstack-config --set /etc/keystone/keystone.conf identity domain_config_dir /etc/keystone/domains
+            	openstack-config --set /etc/keystone/keystone.conf assignment driver keystone.assignment.backends.sql.Assignment
+            	touch /etc/keystone/domains/keystone._ldapdomain_.conf
+                chown keystone /etc/keystone/domains/keystone._ldapdomain_.conf
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap url _ldapserver_
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user _ldapuser_
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap password _ldappassword_
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_tree_dn "cn=users,cn=accounts,dc=example,dc=com"
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_objectclass inetUser
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_id_attribute uid
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_name_attribute uid
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_pass_attribute
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf identity driver keystone.identity.backends.ldap.Identity
+                restorecon -R /etc/keystone
+                systemctl restart openstack-keystone
+            fi
+            if [ `hostname | grep comp | wc -l` -ge 1 ]
+            then
+                openstack-config --set /etc/nova/nova.conf keystone_authtoken auth_version v3
+                systemctl restart openstack-nova-compute.service 
+            fi
+            # Configure SSH on all nodes
+            sed -i 's/^PasswordAuth.*/PasswordAuthentication yes/' /etc/ssh/sshd_config 
+            systemctl restart sshd
+          params: 
+            _ldapserver_: {get_param: ldapserver}
+            _ldapdomain_: {get_param: ldapdomain}
+            _ldappassword_: {get_param: ldappassword}
+            _ldapuser_: {get_param: ldapuser}
+
+  ExtraDeployments:
+    type: OS::Heat::SoftwareDeployments
+    properties:
+      name: ExtraDeployments
+      servers:  {get_param: servers}
+      config: {get_resource: ExtraConfig}
+      actions: ['CREATE'] # Only do this on CREATE

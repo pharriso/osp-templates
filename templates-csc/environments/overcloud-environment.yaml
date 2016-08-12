@@ -1,0 +1,59 @@
+## Custom changes to overcloud
+resource_registry:
+  OS::TripleO::ControllerExtraConfigPre: /home/stack/templates/extraconfig/pre_deploy/pre-deploy.yaml
+  OS::TripleO::NodeExtraConfigPost: /home/stack/templates/extraconfig/post_deploy/extraconfig.yaml
+  #OS::TripleO::NodeExtraConfig: /home/stack/templates/extraconfig/pre_deploy/rhel-registration/rhel-registration.yaml
+
+parameter_defaults:
+  TimeZone: 'London' 
+  CloudDomain: 'example.com'
+  ldapserver: 'ldap://192.168.10.10,ldap://192.168.10.11'
+  ldapdomain: 'EXAMPLE'
+  ldappassword: redhat123
+  ldapuser: "uid=search,cn=users,cn=accounts,dc=example,dc=com"
+
+  # ScaleIO parameter values used in extraconfig/post_deploy/extraconfig.yaml
+  mdmip: 192.168.30.101
+  scaleiopw: 'Redhat123'
+
+  # Add Lbaasv2 support to neutron.conf
+  NeutronServicePlugins: 'router,qos,neutron_lbaas.services.loadbalancer.plugin.LoadBalancerPluginv2'
+  # Customer wants jumbo frames enabled throughout infrastructure (note we override this at the instance level further down)
+  NeutronTenantMtu: 8000
+
+  ControllerEnableSwiftStorage: False
+ 
+  NovaComputeLibvirtType: qemu
+
+  # Below section configures hostnames
+  ControllerSchedulerHints:
+      'capabilities:node': 'controller-%index%'
+  NovaComputeSchedulerHints:
+      'capabilities:node': 'compute-%index%'
+  HostnameMap:
+      overcloud-controller-0: controller0
+      overcloud-controller-1: controller1
+      overcloud-controller-2: controller2
+      overcloud-compute-0: compute0
+      overcloud-compute-1: compute1
+      overcloud-compute-2: compute2
+
+  # Needed because we enable keystone v3 for ldap domain support
+  ExtraConfig:
+      nova::api::auth_version: v3
+
+  # Note below we override the neutron mtu for instances to 1400. This is because the customer wants jumbo frames enabled but not by default on instances
+  controllerExtraConfig:
+      horizon::keystone_multidomain_support: True
+      horizon::keystone_default_domain: Default
+      horizon::api_versions: "{'identity': 3}"
+      cinder::api::auth_uri: http://192.168.20.70:5000/v3
+      keystone::config::keystone_config: 
+                 identity/domain_config_dir: 
+                        value: '/etc/keystone/domains'
+                 assignment/driver: 
+                        value: 'keystone.assignment.backends.sql.Assignment'
+      ceilometer::config::ceilometer_config:
+                 api/workers:
+                        value: 3
+      neutron_dnsmasq_options: 'dhcp-option-force=26,1400'

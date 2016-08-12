@@ -1,0 +1,38 @@
+parameter_defaults:
+
+  CinderEnableIscsiBackend: false
+  CinderEnableRbdBackend: false
+  CinderEnableNfsBackend: false
+  NovaEnableRbdBackend: false
+  GlanceBackend: file
+  CinderNfsMountOptions: ''
+  GlanceFilePcmkManage: true
+  GlanceFilePcmkFstype: nfs
+  GlanceFilePcmkDevice: '192.168.10.1:/export/glance'
+  GlanceFilePcmkOptions: 'rw,sync,context=system_u:object_r:glance_var_lib_t:s0'
+
+  # ScaleIO Config
+
+  controllerExtraConfig:
+
+    cinder_user_enabled_backends: "[ScaleIO]"
+    cinder::config::cinder_config:
+                 ScaleIO/volume_driver:
+                        value: 'cinder.volume.drivers.emc.scaleio.ScaleIODriver'
+                 ScaleIO/san_ip:
+                        value: '192.168.30.100'
+                 ScaleIO/san_login:
+                        value: 'admin'
+                 ScaleIO/san_password:
+                        value: 'Redhat123'
+                 ScaleIO/sio_protection_domain_name:
+                        value: 'pd1'
+                 ScaleIO/sio_storage_pool_name:
+                        value: 'sp1'
+                 ScaleIO/sio_storage_pools:
+                        value: 'pd1:sp1'
+                 ScaleIO/sio_force_delete:
+                        value: 'False'
+                 ScaleIO/sio_round_volume_capacity:
+                        value: 'True'
+

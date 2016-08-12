@@ -1,0 +1,117 @@
+heat_template_version: 2014-10-16
+
+description: >
+  Example extra config for post-deployment
+
+# Note extra parameters can be defined, then passed data via the
+# environment parameter_defaults, without modifying the parent template
+parameters:
+  servers:
+    type: json
+  ldapserver:
+    type: string
+  ldapdomain:
+    type: string
+  ldapuser:
+    type: string
+  ldappassword:
+    type: string
+
+resources:
+
+  ExtraConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            if [ `hostname | grep cont | wc -l` -ge 1 ]
+            then
+            # LDAP Config only on controllers
+            	setsebool -P authlogin_nsswitch_use_ldap=on
+            	mkdir -p /etc/keystone/domains/
+            	touch /etc/keystone/domains/keystone._ldapdomain_.conf
+                chown -R keystone /etc/keystone/domains
+                restorecon -R /etc/keystone
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap url _ldapserver_
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user _ldapuser_
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap password _ldappassword_
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_tree_dn "cn=users,cn=accounts,dc=example,dc=com"
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_objectclass inetUser
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_id_attribute uid
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_name_attribute uid
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf ldap user_pass_attribute
+                openstack-config --set /etc/keystone/domains/keystone._ldapdomain_.conf identity driver keystone.identity.backends.ldap.Identity
+                systemctl restart openstack-keystone
+
+                # lbaasv2 config
+                if [ `hiera bootstrap_nodeid` = `hostname -s` ]
+                then
+                     neutron-db-manage --service lbaas --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head
+                fi
+                openstack-config --set /etc/neutron/lbaas_agent.ini DEFAULT interface_driver neutron.agent.linux.interface.OVSInterfaceDriver
+                openstack-config --set /etc/neutron/lbaas_agent.ini DEFAULT device_driver neutron_lbaas.drivers.haproxy.namespace_driver.HaproxyNSDriver
+                systemctl stop neutron-lbaas-agent.service
+                systemctl disable neutron-lbaas-agent.service
+                systemctl enable neutron-lbaasv2-agent.service
+                systemctl start neutron-lbaasv2-agent.service
+            fi
+            #if [ `hostname | grep comp | wc -l` -ge 1 ]
+            #then
+            #    openstack-config --set /etc/nova/nova.conf keystone_authtoken auth_version v3
+            #    systemctl restart openstack-nova-compute.service 
+            #fi
+            # Configure SSH on all nodes
+            sed -i 's/^PasswordAuth.*/PasswordAuthentication yes/' /etc/ssh/sshd_config 
+            systemctl restart sshd
+          params: 
+            _ldapserver_: {get_param: ldapserver}
+            _ldapdomain_: {get_param: ldapdomain}
+            _ldappassword_: {get_param: ldappassword}
+            _ldapuser_: {get_param: ldapuser}
+
+  ExtraDeployments:
+    type: OS::Heat::SoftwareDeployments
+    properties:
+      name: ExtraDeployments
+      servers:  {get_param: servers}
+      config: {get_resource: ExtraConfig}
+      actions: ['CREATE'] # Only do this on CREATE
+
+  MyCustomConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config: {get_file: /home/stack/templates/extraconfig/post_deploy/cinder-puppet.pp}
+      group: puppet
+      options:
+        enable_hiera: True
+        enable_facter: False
+
+  MyCustomDeployments: 
+    type: OS::Heat::SoftwareDeployments
+    properties:
+      config: {get_resource: MyCustomConfig}
+      servers: {get_param: servers}
+      actions: ['CREATE','UPDATE']
+
+
+  CinderRestartConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: |
+        #!/bin/bash
+        if [ `hostname | grep cont | wc -l` -ge 1 ]
+        then
+           sudo pcs resource restart openstack-cinder-volume
+        fi
+
+  CinderRestartDeployment:
+    type: OS::Heat::SoftwareDeployments
+    depends_on: MyCustomDeployments
+    properties:
+      servers: {get_param: servers}
+      config: {get_resource: CinderRestartConfig}
+      actions: ['CREATE','UPDATE']

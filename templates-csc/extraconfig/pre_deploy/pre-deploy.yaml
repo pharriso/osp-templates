@@ -1,0 +1,39 @@
+heat_template_version: 2014-10-16
+
+description: >
+  Example extra config for post-deployment
+
+# Note extra parameters can be defined, then passed data via the
+# environment parameter_defaults, without modifying the parent template
+parameters:
+  server:
+    type: string
+
+resources:
+
+  ExtraPreConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: |
+         #!/bin/bash
+         # We need to configure lbaasv2 in neutron_lbaas.conf before we add lbaasv2 service to neutron.conf or neutron won't start causing deploy failure
+         if [ `hostname | grep cont | wc -l` -ge 1 ]
+         then
+         openstack-config --set /etc/neutron/neutron_lbaas.conf service_providers service_provider LOADBALANCERV2:Haproxy:neutron_lbaas.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
+         fi
+         echo "192.168.10.100 satellite.example.com" >> /etc/hosts
+         echo "192.168.10.101 capsule.example.com" >> /etc/hosts
+
+  ExtraPreDeployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      name: ExtraPreDeployment
+      server:  {get_param: server}
+      config: {get_resource: ExtraPreConfig}
+      actions: ['CREATE'] # Only do this on CREATE
+
+outputs:
+  deploy_stdout:
+    description: Deployment reference, used to trigger pre-deploy on changes 
+    value: {get_attr: [ExtraPreDeployment, deploy_stdout]}

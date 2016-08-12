@@ -1,0 +1,44 @@
+heat_template_version: 2014-10-16
+
+description: >
+  Configure Storage Backend 
+
+# Note extra parameters can be defined, then passed data via the
+# environment parameter_defaults, without modifying the parent template
+parameters:
+  servers:
+    type: json
+
+resources:
+
+  MyCustomConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config: {get_file: /home/stack/templates/extraconfig/post_deploy/cinder-puppet.pp}
+      group: puppet
+      options:
+        enable_hiera: True
+        enable_facter: False
+
+  MyCustomDeployments: 
+    type: OS::Heat::SoftwareDeployments
+    properties:
+      config: {get_resource: MyCustomConfig}
+      servers: {get_param: servers}
+
+
+  CinderRestartConfig:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: |
+        #!/bin/bash
+        sudo pcs resource restart openstack-cinder-volume
+
+  CinderRestartDeployment:
+    type: OS::Heat::SoftwareDeployments
+    depends_on: MyCustomDeployments
+    properties:
+      servers: {get_param: servers}
+      config: {get_resource: CinderRestartConfig}
+      actions: ['CREATE','UPDATE']
