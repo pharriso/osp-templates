@@ -1,0 +1,23 @@
+{
+  "name": "thoraxe-motd",
+  "version": "0.1.1",
+  "source": "UNKNOWN",
+  "author": "thoraxe",
+  "license": "Apache License, Version 2.0",
+  "summary": "UNKNOWN",
+  "description": "UNKNOWN",
+  "project_page": "UNKNOWN",
+  "dependencies": [
+
+  ],
+  "types": [
+
+  ],
+  "checksums": {
+    "Modulefile": "a00942f7e84cd2fa0b4435b84cbb6e73",
+    "README": "6a826ab4bb2c40e3b4d7295819e2d7e0",
+    "manifests/init.pp": "272fdc99b3581081d7b327dfbadcb196",
+    "spec/spec_helper.rb": "a55d1e6483344f8ec6963fcb2c220372",
+    "tests/init.pp": "73a39d1f507bc3ab20d982ac9b950ba0"
+  }
+}
